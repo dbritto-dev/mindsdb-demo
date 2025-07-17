@@ -1,0 +1,13 @@
+{
+  "mcp": {
+    "servers": {
+      "minds-db-mcp": {
+        "type": "sse",
+        "url": "http://localhost:47337/sse",
+        "headers": {
+          "Authorization": "Bearer <token-generated>"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "midnds-db-mcp-server": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "supercorp/supergateway",
+        "--sse",
+        "http://host.docker.internal:47337/sse",
+        "--oauth2Bearer",
+        "<token-generated>"
+      ]
+    }
+  }
+}

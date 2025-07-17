@@ -1,0 +1,13 @@
+services:
+  app:
+    image: mindsdb/mindsdb
+    environment:
+      - MINDSDB_MCP_ACCESS_TOKEN=<token-generated>
+      - MINDSDB_APIS=http,postgres,mcp,a2a
+    ports:
+      - "47334:47334"
+      - "47335:47335"
+      - "47337:47337"
+      - "47338:47338"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
