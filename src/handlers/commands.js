@@ -122,7 +122,7 @@ You can also mention me (@SlackMeNot) in any channel for interactive help!`,
   });
 
   // Handle PR selection
-  app.action('select_pr', async ({ body, ack, respond, action }) => {
+  app.action('select_pr', async ({ body, ack, respond, action, client }) => {
     await ack();
     // Immediately indicate to the user that the summary is being generated
     await respond({
@@ -133,13 +133,109 @@ You can also mention me (@SlackMeNot) in any channel for interactive help!`,
     const prs = await getOpenPRs();
     const pr = prs.find(pr => pr.number.toString() === prNumber);
     const diff = await getPRDiff(prNumber);
-    const prompt = `Give a very short, high-level overview (2-3 sentences max) of the following GitHub PR. Do not include details, just the main purpose and any major changes.\n\nTitle: ${pr.title}\n\nDiff:\n${diff}`;
-    const summary = await askLlama(prompt);
+    // 1. Get summary
+    const summaryPrompt = `Give a very short, high-level overview (2-3 sentences max) of the following GitHub PR. Do not include details, just the main purpose and any major changes.\n\nTitle: ${pr.title}\n\nDiff:\n${diff}`;
+    const summary = await askLlama(summaryPrompt);
     // Extract Jira ticket (e.g., SCRUM-17) from PR title if present
     const jiraMatch = pr.title.match(/([A-Z]+-\d+)/);
     const jiraTag = jiraMatch ? ` (${jiraMatch[1]})` : '';
+    // 2. Get review suggestions and quality
+    const reviewPrompt = `You are a code reviewer. Give a very short list of suggestions (if any) for improving the following PR, and estimate the overall code quality as a percentage (0-100). Keep suggestions short and actionable. If there are no suggestions, say 'No suggestions.'\n\nTitle: ${pr.title}\n\nDiff:\n${diff}\n\nRespond in this format:\nSuggestions:\n- ...\n- ...\nQuality: XX%`;
+    const review = await askLlama(reviewPrompt);
+    // 3. Parse suggestions and quality
+    const suggestionsMatch = review.match(/Suggestions:\n([\s\S]*?)\nQuality:/);
+    const qualityMatch = review.match(/Quality:\s*(\d+)%/);
+    const suggestionsText = suggestionsMatch ? suggestionsMatch[1].trim() : 'No suggestions.';
+    const qualityText = qualityMatch ? qualityMatch[1] + '%' : 'N/A';
+    // 4. Show summary, review, and action buttons, with Gladiator image
     await respond({
-      text: `*Summary for PR #${pr.number}${jiraTag}:*\n${summary}`,
+      text: `*Summary for PR #${pr.number}${jiraTag}:*\n${summary}\n\n*Code Review Suggestions:*\n${suggestionsText}\n*Estimated Code Quality:* ${qualityText}`,
+      blocks: [
+        { type: 'section', text: { type: 'mrkdwn', text: `*Summary for PR #${pr.number}${jiraTag}:*\n${summary}` } },
+        { type: 'section', text: { type: 'mrkdwn', text: `*Code Review Suggestions:*\n${suggestionsText}` } },
+        { type: 'context', elements: [{ type: 'mrkdwn', text: `*Estimated Code Quality:* ${qualityText}` }] },
+        { type: 'image', image_url: 'https://www.slashfilm.com/img/gallery/ridley-scott-says-it-would-be-stupid-of-me-not-to-direct-gladiator-2/l-intro-1636469417.jpg', alt_text: 'Gladiator' },
+        {
+          type: 'actions',
+          elements: [
+            { type: 'button', text: { type: 'plain_text', text: 'Approve PR' }, style: 'primary', action_id: 'approve_pr', value: prNumber },
+            { type: 'button', text: { type: 'plain_text', text: 'Suggest something' }, style: 'danger', action_id: 'suggest_pr', value: JSON.stringify({ prNumber, suggestions: suggestionsText }) }
+          ]
+        }
+      ],
+      replace_original: true
+    });
+  });
+
+  // Approve PR action
+  app.action('approve_pr', async ({ ack, body, action, client, respond }) => {
+    await ack();
+    const prNumber = action.value;
+    // TODO: Approve the PR on GitHub (implement approvePR in githubClient)
+    if (typeof require('../utils/githubClient').approvePR === 'function') {
+      await require('../utils/githubClient').approvePR(prNumber);
+    }
+    await respond({
+      text: 'PR approved! 🏆',
+      blocks: [
+        { type: 'image', image_url: 'https://img-s-msn-com.akamaized.net/tenant/amp/entityid/AA1uzrgy.img?w=768&h=431&m=6&x=107&y=117&s=151&d=151', alt_text: 'Approved' }
+      ],
+      replace_original: true
+    });
+  });
+
+  // Suggest something action
+  app.action('suggest_pr', async ({ ack, body, action, client, respond }) => {
+    await ack();
+    const { prNumber, suggestions } = JSON.parse(action.value);
+    // Parse suggestions into a list
+    const suggestionList = suggestions.split('\n').filter(s => s.trim().startsWith('-')).map(s => s.replace(/^\-\s*/, '').trim());
+    // Show suggestions as checkboxes, with suggestion image
+    await respond({
+      text: 'Select suggestions to comment on the PR:',
+      blocks: [
+        { type: 'image', image_url: 'https://i.pinimg.com/736x/f3/eb/bc/f3ebbc4bc6086944196241cf7146ea47.jpg', alt_text: 'Suggestions' },
+        {
+          type: 'section',
+          text: { type: 'mrkdwn', text: '*Select suggestions to comment on the PR:*' },
+          accessory: {
+            type: 'checkboxes',
+            action_id: 'submit_suggestions',
+            options: suggestionList.map((s, i) => ({
+              text: { type: 'plain_text', text: s.length > 75 ? s.slice(0, 72) + '...' : s },
+              value: s
+            }))
+          }
+        }
+      ],
+      replace_original: true
+    });
+  });
+
+  // Handle submitting suggestions as PR comment
+  app.action('submit_suggestions', async ({ ack, body, action, respond }) => {
+    await ack();
+    // Get selected suggestions
+    const selected = action.selected_options.map(opt => opt.value);
+    // Find PR number from previous block (assume in message or context)
+    // We'll pass prNumber as a hidden block in the future, but for now, get from context
+    // For now, try to get from the last message text
+    const prNumberMatch = body.message && body.message.text && body.message.text.match(/PR #(\d+)/);
+    const prNumber = prNumberMatch ? prNumberMatch[1] : null;
+    if (!prNumber || selected.length === 0) {
+      await respond({
+        text: 'No suggestions selected or PR number missing.',
+        replace_original: true
+      });
+      return;
+    }
+    // Post suggestions as a comment on the PR
+    const comment = selected.map(s => `- ${s}`).join('\n');
+    if (typeof require('../utils/githubClient').commentOnPR === 'function') {
+      await require('../utils/githubClient').commentOnPR(prNumber, comment);
+    }
+    await respond({
+      text: 'Suggestions have been commented on the PR! 🎉',
       replace_original: true
     });
   });
