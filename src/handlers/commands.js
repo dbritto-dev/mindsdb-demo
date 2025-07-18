@@ -1,6 +1,7 @@
 const logger = require('../utils/logger');
 const { getOpenPRs, getPRDiff } = require('../utils/githubClient');
 const { askLlama } = require('../utils/mindsdbClient');
+const ollama = require('ollama').default
 
 /**
  * Setup command handlers for the Slack app
@@ -141,6 +142,36 @@ You can also mention me (@SlackMeNot) in any channel for interactive help!`,
     await respond({
       text: `*Summary for PR #${pr.number}${jiraTag}:*\n${summary}`,
       replace_original: true
+    });
+  });
+
+  // ask data
+  app.command('/ask', async ({ command, ack, respond }) => {
+    await ack();
+    const question = command.text.trim();
+
+    const response = await ollama.chat({
+      model: 'qwen3:latest',
+      messages: [
+        { 'role': 'system', 'content': 'You are a helpful assistant.' },
+        { 'role': 'user', 'content': question }
+      ],
+      tools: [
+        {
+          "type": "mcp",
+          "server_label": "deepwiki",
+          "server_url": new URL("/sse", process.env.MINDSDB_URL),
+          "require_approval": "never",
+          "headers": {
+            "Authorization": `Bearer ${process.env.MINDSDB_MCP_ACCESS_TOKEN}`
+          }
+        }
+      ]
+    })
+
+    await respond({
+      text: response.message.tool_calls?.[0]?.function?.arguments?.answer || '',
+      response_type: 'ephemeral'
     });
   });
 }
