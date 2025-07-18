@@ -1,4 +1,6 @@
 const logger = require('../utils/logger');
+const { getOpenPRs, getPRDiff } = require('../utils/githubClient');
+const { askLlama } = require('../utils/mindsdbClient');
 
 /**
  * Setup command handlers for the Slack app
@@ -72,6 +74,75 @@ You can also mention me (@SlackMeNot) in any channel for interactive help!`,
       });
     }
   });
+
+  // /all-prs command
+  app.command('/all-prs', async ({ command, ack, respond, client }) => {
+    await ack();
+    const prs = await getOpenPRs();
+    if (!prs.length) {
+      await respond('No open PRs found.');
+      return;
+    }
+    const options = prs.map(pr => {
+      // Slack requires option text to be <= 75 chars
+      let text = `#${pr.number}: ${pr.title}`;
+      if (text.length > 75) {
+        text = text.slice(0, 72) + '...';
+      }
+      return {
+        text: {
+          type: 'plain_text',
+          text
+        },
+        value: pr.number.toString()
+      };
+    });
+    // Respond to the slash command with a simple message
+    await respond({
+      text: 'Fetching open PRs... Please wait.',
+      response_type: 'ephemeral'
+    });
+    // Send the interactive message with blocks using chat.postMessage
+    await client.chat.postMessage({
+      channel: command.channel_id,
+      text: 'Select a PR to summarize:',
+      blocks: [
+        {
+          type: 'section',
+          text: { type: 'mrkdwn', text: '*Select a PR to summarize:*' },
+          accessory: {
+            type: 'static_select',
+            action_id: 'select_pr',
+            placeholder: { type: 'plain_text', text: 'Choose a PR' },
+            options
+          }
+        }
+      ]
+    });
+  });
+
+  // Handle PR selection
+  app.action('select_pr', async ({ body, ack, respond, action }) => {
+    await ack();
+    // Immediately indicate to the user that the summary is being generated
+    await respond({
+      text: 'Summarizing PR... please wait.',
+      response_type: 'ephemeral'
+    });
+    const prNumber = action.selected_option.value;
+    const prs = await getOpenPRs();
+    const pr = prs.find(pr => pr.number.toString() === prNumber);
+    const diff = await getPRDiff(prNumber);
+    const prompt = `Give a very short, high-level overview (2-3 sentences max) of the following GitHub PR. Do not include details, just the main purpose and any major changes.\n\nTitle: ${pr.title}\n\nDiff:\n${diff}`;
+    const summary = await askLlama(prompt);
+    // Extract Jira ticket (e.g., SCRUM-17) from PR title if present
+    const jiraMatch = pr.title.match(/([A-Z]+-\d+)/);
+    const jiraTag = jiraMatch ? ` (${jiraMatch[1]})` : '';
+    await respond({
+      text: `*Summary for PR #${pr.number}${jiraTag}:*\n${summary}`,
+      replace_original: true
+    });
+  });
 }
 
 /**
@@ -82,10 +153,10 @@ async function handleSlackMeNotCommand(commandText, command, respond, context) {
   const subcommand = args[0];
 
   switch (subcommand) {
-  case 'status':
-  case 'health':
-    await respond({
-      text: `✅ *Bot Status Report*
+    case 'status':
+    case 'health':
+      await respond({
+        text: `✅ *Bot Status Report*
         
 • Status: Online and healthy
 • Environment: ${process.env.NODE_ENV || 'development'}
@@ -94,14 +165,14 @@ async function handleSlackMeNotCommand(commandText, command, respond, context) {
 • Node Version: ${process.version}
 • Team ID: ${context.teamId}
 • User ID: ${command.user_id}`,
-      response_type: 'ephemeral'
-    });
-    break;
+        response_type: 'ephemeral'
+      });
+      break;
 
-  case 'info':
-  case 'about':
-    await respond({
-      text: `🤖 *SlackMeNot Bot Information*
+    case 'info':
+    case 'about':
+      await respond({
+        text: `🤖 *SlackMeNot Bot Information*
         
 • Name: SlackMeNot
 • Version: 1.0.0
@@ -112,34 +183,34 @@ async function handleSlackMeNotCommand(commandText, command, respond, context) {
 • User: <@${command.user_id}>
 
 Built with ❤️ using the Slack Bolt Framework for reliable bot development.`,
-      response_type: 'ephemeral'
-    });
-    break;
+        response_type: 'ephemeral'
+      });
+      break;
 
-  case 'ping':
-    await respond({
-      text: '🏓 Pong! Bot is alive and responding.',
-      response_type: 'ephemeral'
-    });
-    break;
+    case 'ping':
+      await respond({
+        text: '🏓 Pong! Bot is alive and responding.',
+        response_type: 'ephemeral'
+      });
+      break;
 
-  case 'version':
-    await respond({
-      text: `📦 *Version Information*
+    case 'version':
+      await respond({
+        text: `📦 *Version Information*
         
 • Bot Version: 1.0.0
 • Node.js: ${process.version}
 • Bolt Framework: 3.17.1
 • Environment: ${process.env.NODE_ENV || 'development'}`,
-      response_type: 'ephemeral'
-    });
-    break;
+        response_type: 'ephemeral'
+      });
+      break;
 
-  case 'debug':
-    // Only allow debug in development
-    if (process.env.NODE_ENV === 'development') {
-      await respond({
-        text: `🔧 *Debug Information*
+    case 'debug':
+      // Only allow debug in development
+      if (process.env.NODE_ENV === 'development') {
+        await respond({
+          text: `🔧 *Debug Information*
           
 • Command: ${command.command}
 • Text: ${command.text}
@@ -149,24 +220,24 @@ Built with ❤️ using the Slack Bolt Framework for reliable bot development.`,
 • Timestamp: ${command.trigger_id}
 • Environment: ${process.env.NODE_ENV}
 • Process ID: ${process.pid}`,
-        response_type: 'ephemeral'
-      });
-    } else {
-      await respond({
-        text: 'Debug mode is only available in development environment.',
-        response_type: 'ephemeral'
-      });
-    }
-    break;
+          response_type: 'ephemeral'
+        });
+      } else {
+        await respond({
+          text: 'Debug mode is only available in development environment.',
+          response_type: 'ephemeral'
+        });
+      }
+      break;
 
-  default:
-    await respond({
-      text: `Unknown command: "${subcommand}"
+    default:
+      await respond({
+        text: `Unknown command: "${subcommand}"
         
 Try \`/slackmenot help\` to see available commands.`,
-      response_type: 'ephemeral'
-    });
-    break;
+        response_type: 'ephemeral'
+      });
+      break;
   }
 }
 

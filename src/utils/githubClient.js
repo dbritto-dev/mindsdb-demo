@@ -18,6 +18,16 @@ async function getOpenPRs(branch = 'main') {
     return res.data;
 }
 
+async function getPRDiff(prNumber) {
+    const res = await githubApi.get(`/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${prNumber}`, {
+        headers: {
+            Authorization: `token ${GITHUB_TOKEN}`,
+            Accept: 'application/vnd.github.v3.diff'
+        }
+    });
+    return res.data;
+}
+
 // Example usage: fetch and log open PRs
 if (require.main === module) {
     (async () => {
@@ -33,5 +43,5 @@ if (require.main === module) {
     })();
 }
 
-module.exports = { getOpenPRs };
+module.exports = { getOpenPRs, getPRDiff };
 
