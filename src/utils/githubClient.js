@@ -28,6 +28,22 @@ async function getPRDiff(prNumber) {
     return res.data;
 }
 
+async function commentOnPR(prNumber, comment) {
+    // Get the PR to find the issue number (PRs are issues in GitHub API)
+    // But the PR number is the same as the issue number for comments
+    await githubApi.post(`/repos/${REPO_OWNER}/${REPO_NAME}/issues/${prNumber}/comments`, {
+        body: comment
+    });
+}
+
+async function approvePR(prNumber) {
+    // Approve the PR by submitting a review
+    await githubApi.post(`/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${prNumber}/reviews`, {
+        event: 'APPROVE',
+        body: 'Approved by SlackMeNot bot.'
+    });
+}
+
 // Example usage: fetch and log open PRs
 if (require.main === module) {
     (async () => {
@@ -43,5 +59,5 @@ if (require.main === module) {
     })();
 }
 
-module.exports = { getOpenPRs, getPRDiff };
+module.exports = { getOpenPRs, getPRDiff, commentOnPR, approvePR };
 
