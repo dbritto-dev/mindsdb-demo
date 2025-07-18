@@ -5,7 +5,9 @@ module.exports = {
     },
     extends: [
         'eslint:recommended',
+        'plugin:prettier/recommended'
     ],
+    plugins: ['prettier'],
     parserOptions: {
         ecmaVersion: 12,
         sourceType: 'module',
@@ -21,6 +23,7 @@ module.exports = {
         'no-var': 'error',
         'object-shorthand': 'error',
         'prefer-template': 'error',
+        'prettier/prettier': 'error',
     },
     overrides: [
         {

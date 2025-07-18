@@ -6,7 +6,7 @@ const logger = require('./logger');
  * @returns {string} Formatted timestamp
  */
 function formatTimestamp(timestamp) {
-    return new Date(timestamp * 1000).toLocaleString();
+  return new Date(timestamp * 1000).toLocaleString();
 }
 
 /**
@@ -15,15 +15,15 @@ function formatTimestamp(timestamp) {
  * @returns {Array} Array of user IDs
  */
 function extractUserMentions(text) {
-    const mentionRegex = /<@([A-Z0-9]+)>/g;
-    const mentions = [];
-    let match;
+  const mentionRegex = /<@([A-Z0-9]+)>/g;
+  const mentions = [];
+  let match;
 
-    while ((match = mentionRegex.exec(text)) !== null) {
-        mentions.push(match[1]);
-    }
+  while ((match = mentionRegex.exec(text)) !== null) {
+    mentions.push(match[1]);
+  }
 
-    return mentions;
+  return mentions;
 }
 
 /**
@@ -32,18 +32,18 @@ function extractUserMentions(text) {
  * @returns {Array} Array of channel IDs
  */
 function extractChannelMentions(text) {
-    const channelRegex = /<#([A-Z0-9]+)\|([^>]+)>/g;
-    const channels = [];
-    let match;
+  const channelRegex = /<#([A-Z0-9]+)\|([^>]+)>/g;
+  const channels = [];
+  let match;
 
-    while ((match = channelRegex.exec(text)) !== null) {
-        channels.push({
-            id: match[1],
-            name: match[2]
-        });
-    }
+  while ((match = channelRegex.exec(text)) !== null) {
+    channels.push({
+      id: match[1],
+      name: match[2]
+    });
+  }
 
-    return channels;
+  return channels;
 }
 
 /**
@@ -52,14 +52,14 @@ function extractChannelMentions(text) {
  * @returns {string} Sanitized text
  */
 function sanitizeText(text) {
-    if (!text) return '';
+  if (!text) return '';
 
-    // Remove potential tokens or sensitive data
-    return text
-        .replace(/xoxb-[a-zA-Z0-9-]+/g, '[BOT_TOKEN]')
-        .replace(/xoxp-[a-zA-Z0-9-]+/g, '[USER_TOKEN]')
-        .replace(/xoxa-[a-zA-Z0-9-]+/g, '[APP_TOKEN]')
-        .substring(0, 200); // Limit length
+  // Remove potential tokens or sensitive data
+  return text
+    .replace(/xoxb-[a-zA-Z0-9-]+/g, '[BOT_TOKEN]')
+    .replace(/xoxp-[a-zA-Z0-9-]+/g, '[USER_TOKEN]')
+    .replace(/xoxa-[a-zA-Z0-9-]+/g, '[APP_TOKEN]')
+    .substring(0, 200); // Limit length
 }
 
 /**
@@ -67,28 +67,28 @@ function sanitizeText(text) {
  * @returns {Object} Validation result
  */
 function validateEnvironment() {
-    const required = [
-        'SLACK_BOT_TOKEN',
-        'SLACK_SIGNING_SECRET',
-        'SLACK_APP_TOKEN'
-    ];
+  const required = [
+    'SLACK_BOT_TOKEN',
+    'SLACK_SIGNING_SECRET',
+    'SLACK_APP_TOKEN'
+  ];
 
-    const missing = [];
-    const present = {};
+  const missing = [];
+  const present = {};
 
-    for (const varName of required) {
-        if (!process.env[varName]) {
-            missing.push(varName);
-        } else {
-            present[varName] = process.env[varName].substring(0, 10) + '...';
-        }
+  for (const varName of required) {
+    if (!process.env[varName]) {
+      missing.push(varName);
+    } else {
+      present[varName] = `${process.env[varName].substring(0, 10)  }...`;
     }
+  }
 
-    return {
-        isValid: missing.length === 0,
-        missing,
-        present
-    };
+  return {
+    isValid: missing.length === 0,
+    missing,
+    present
+  };
 }
 
 /**
@@ -96,15 +96,15 @@ function validateEnvironment() {
  * @returns {Object} Bot info
  */
 function getBotInfo() {
-    return {
-        name: process.env.BOT_NAME || 'SlackMeNot',
-        version: '1.0.0',
-        environment: process.env.NODE_ENV || 'development',
-        uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        nodeVersion: process.version,
-        pid: process.pid
-    };
+  return {
+    name: process.env.BOT_NAME || 'SlackMeNot',
+    version: '1.0.0',
+    environment: process.env.NODE_ENV || 'development',
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    nodeVersion: process.version,
+    pid: process.pid
+  };
 }
 
 /**
@@ -114,11 +114,11 @@ function getBotInfo() {
  * @returns {Object} Formatted response
  */
 function createResponse(text, options = {}) {
-    return {
-        text,
-        response_type: options.response_type || 'in_channel',
-        ...options
-    };
+  return {
+    text,
+    response_type: options.response_type || 'in_channel',
+    ...options
+  };
 }
 
 /**
@@ -127,20 +127,20 @@ function createResponse(text, options = {}) {
  * @param {Object} context - Context information
  */
 function logActivity(action, context = {}) {
-    logger.info('Bot activity', {
-        action,
-        timestamp: new Date().toISOString(),
-        ...context
-    });
+  logger.info('Bot activity', {
+    action,
+    timestamp: new Date().toISOString(),
+    ...context
+  });
 }
 
 module.exports = {
-    formatTimestamp,
-    extractUserMentions,
-    extractChannelMentions,
-    sanitizeText,
-    validateEnvironment,
-    getBotInfo,
-    createResponse,
-    logActivity
+  formatTimestamp,
+  extractUserMentions,
+  extractChannelMentions,
+  sanitizeText,
+  validateEnvironment,
+  getBotInfo,
+  createResponse,
+  logActivity
 }; 

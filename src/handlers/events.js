@@ -1,4 +1,5 @@
 const logger = require('../utils/logger');
+const { askLlama } = require('../utils/mindsdbClient');
 
 /**
  * Setup event handlers for the Slack app
@@ -122,9 +123,10 @@ You can also mention me with questions or requests!`,
             thread_ts: event.ts
         });
     } else {
+        // Use MindsDB Llama for a short AI response
+        const aiReply = await askLlama(messageText);
         await say({
-            text: `I heard you say: "${messageText}"
-I'm still learning! Try mentioning me with "help" to see what I can do.`,
+            text: aiReply,
             thread_ts: event.ts
         });
     }
