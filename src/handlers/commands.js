@@ -151,23 +151,23 @@ You can also mention me (@SlackMeNot) in any channel for interactive help!`,
     const question = command.text.trim();
 
     const response = await ollama.chat({
-      model: 'qwen3:latest',
+      model: "qwen3:latest",
       messages: [
-        { 'role': 'system', 'content': 'You are a helpful assistant.' },
-        { 'role': 'user', 'content': question }
+        { role: "system", content: "You are a helpful assistant. Thank you!" },
+        { role: "user", content: question },
       ],
       tools: [
         {
-          "type": "mcp",
-          "server_label": "deepwiki",
-          "server_url": new URL("/sse", process.env.MINDSDB_URL),
-          "require_approval": "never",
-          "headers": {
-            "Authorization": `Bearer ${process.env.MINDSDB_MCP_ACCESS_TOKEN}`
-          }
-        }
-      ]
-    })
+          type: "mcp",
+          server_label: "deepwiki",
+          server_url: new URL("/sse", process.env.MINDSDB_URL),
+          require_approval: "never",
+          headers: {
+            Authorization: `Bearer ${process.env.MINDSDB_MCP_ACCESS_TOKEN}`,
+          },
+        },
+      ],
+    });
 
     await respond({
       text: response.message.tool_calls?.[0]?.function?.arguments?.answer || '',
