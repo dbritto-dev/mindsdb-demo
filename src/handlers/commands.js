@@ -81,7 +81,7 @@ You can also mention me (@SlackMeNot) in any channel for interactive help!`,
     await ack();
     const prs = await getOpenPRs();
     if (!prs.length) {
-      await respond('No open PRs found.');
+      await respond("No open PRs found. Create a PR and try again!");
       return;
     }
     const options = prs.map(pr => {
